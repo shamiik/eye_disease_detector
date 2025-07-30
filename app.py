@@ -1,9 +1,20 @@
+import os
+import gdown
 import streamlit as st
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
 import numpy as np
 from PIL import Image
 
+# ===== Download model if not present =====
+model_path = "ensemble.h5"
+google_drive_file_id = "1nMMuGAK1HSnSuBe8P1st_tq3ltsK_738"  # Replace this!
+# https://drive.google.com/file/d/1nMMuGAK1HSnSuBe8P1st_tq3ltsK_738
+if not os.path.exists(model_path):
+    st.info("Downloading model from Google Drive... ⏳")
+    gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
+    st.success("Model downloaded successfully!")
+    
 # Load the trained model
 @st.cache_resource
 def load_eye_model():
