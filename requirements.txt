@@ -1,5 +1,6 @@
 streamlit
-tensorflow-cpu
+tensorflow-cpu==2.13.0
 pillow
 gdown
-tensorflow-addons
+tensorflow-addons==0.21.0
+
