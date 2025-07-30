@@ -6,10 +6,14 @@ from tensorflow.keras.preprocessing import image
 import numpy as np
 from PIL import Image
 
+# 👇 Only if SelfAttention is from tensorflow_addons
+import tensorflow_addons as tfa
+SelfAttention = tfa.layers.SelfAttention
+
 # === Streamlit Page Config ===
 st.set_page_config(page_title="Eye Disease Detector", page_icon="🧠", layout="centered")
 
-# === Model download from Google Drive ===
+# === Model download ===
 model_path = "ensemble.h5"
 google_drive_file_id = "1nMMuGAK1HSnSuBe8P1st_tq3ltsK_738"
 
@@ -18,12 +22,13 @@ if not os.path.exists(model_path):
         gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
     st.success("✅ Model downloaded successfully!")
 
-# === Load model without compiling (safe for inference) ===
+# === Load model with SelfAttention ===
 @st.cache_resource
 def load_eye_model():
-    return load_model(model_path, compile=False)
+    return load_model(model_path, compile=False, custom_objects={"SelfAttention": SelfAttention})
 
 model = load_eye_model()
+
 
 # === Class names (update if needed) ===
 class_names = ['Cataract', 'Glaucoma', 'Normal', 'Diabetic Retinopathy']
