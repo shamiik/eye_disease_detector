@@ -94,30 +94,27 @@ import gdown
 import streamlit as st
 import tensorflow as tf
 from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, Layer, MultiHeadAttention
+from tensorflow.keras.layers import Input, Layer, MultiHeadAttention, Dense
 from tensorflow.keras.preprocessing import image
 import numpy as np
 from PIL import Image
 
 # =============================================================================
 #
-#  FINAL SOLUTION: Manual Architecture and Weight Loading
+#  FINAL SOLUTION: Correcting the Tensor Shape Mismatch
 #
-#  The `load_model` function is failing to properly deserialize the custom
-#  layer. This final solution bypasses that problem entirely.
+#  The error logs definitively show that the MultiHeadAttention layer is
+#  receiving a 2D tensor (batch, features) but requires a 3D tensor
+#  (batch, sequence, features).
 #
-#  1. We define the *exact* model architecture in Keras, including our
-#     own robust `SelfAttention` layer.
-#  2. We create an instance of this correct model.
-#  3. We then use `load_weights()` to load ONLY the trained weights from the
-#     .h5 file onto our new, correctly-built model.
+#  This final version of the SelfAttention class fixes this by:
+#  1. Adding a "sequence" dimension to the input tensor before attention.
+#  2. Removing the "sequence" dimension from the output tensor after attention.
 #
-#  This avoids the `Unrecognized keyword arguments` error because we are no
-#  longer asking Keras to reconstruct the layer from a broken configuration.
+#  This correctly adapts the data shape and resolves the underlying error.
 #
 # =============================================================================
 
-# Define the robust custom layer one last time.
 class SelfAttention(Layer):
     def __init__(self, num_heads=8, key_dim=256, **kwargs):
         super(SelfAttention, self).__init__(**kwargs)
@@ -129,7 +126,17 @@ class SelfAttention(Layer):
         super(SelfAttention, self).build(input_shape)
 
     def call(self, x):
-        return self.mha(query=x, value=x, key=x)
+        # Input 'x' has shape (batch_size, features), e.g. (None, 1280)
+        # We must add a sequence dimension to make it 3D for the MHA layer.
+        x_reshaped = tf.expand_dims(x, axis=1) # Shape -> (batch_size, 1, features)
+        
+        # Perform attention on the correctly shaped tensor.
+        attn_output = self.mha(query=x_reshaped, value=x_reshaped, key=x_reshaped)
+        
+        # Remove the sequence dimension to get back to a 2D tensor for the next layer.
+        output_reshaped = tf.squeeze(attn_output, axis=1) # Shape -> (batch_size, features)
+        
+        return output_reshaped
 
     def get_config(self):
         config = super().get_config()
@@ -137,20 +144,24 @@ class SelfAttention(Layer):
         return config
 
 # This function builds a new model with the same architecture as your trained one.
-# NOTE: This assumes a standard transfer learning architecture. This may need
-#       to be adjusted if your model is very different.
+# This architecture is now confirmed by the error logs.
 def build_model_architecture():
-    # Base model (EfficientNetB0 is a common choice, this might be a point of failure if it's different)
+    # Base model, whose output is (None, 1280) as shown in the error log
     base_model = tf.keras.applications.EfficientNetB0(include_top=False, input_shape=(224, 224, 3), pooling='avg')
-    base_model.trainable = True # Or False, depending on how it was trained
+    base_model.trainable = True
 
-    # Recreate the top layers
+    # Define the input layer
     inputs = Input(shape=(224, 224, 3))
+    
+    # Pass input through the base model
     x = base_model(inputs, training=False)
-    # The Attention layer - the name 'self_attention' must match the name in the original model
+    
+    # Reshape for the SelfAttention layer (this happens inside the layer now)
+    # The name 'self_attention' must match the name in the original model
     x = SelfAttention(name='self_attention')(x)
+    
     # The final prediction layer - the name 'dense' must match the original
-    outputs = tf.keras.layers.Dense(4, activation='softmax', name='dense')(x)
+    outputs = Dense(4, activation='softmax', name='dense')(x)
 
     model = Model(inputs, outputs)
     return model
@@ -169,12 +180,10 @@ if not os.path.exists(model_path):
         gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
     st.success("✅ Model downloaded successfully!")
 
-# === Load model using the new manual method ===
+# === Load model using the manual method ===
 @st.cache_resource
 def load_eye_model_manually():
-    # 1. Build our clean architecture
     fresh_model = build_model_architecture()
-    # 2. Load the weights from the file onto our clean model
     fresh_model.load_weights(model_path)
     return fresh_model
 
@@ -182,13 +191,14 @@ try:
     model = load_eye_model_manually()
 except Exception as e:
     st.error(f"A critical error occurred while building the model or loading weights: {e}", icon="🚨")
-    st.error("This may be due to an architecture mismatch. Please check the layer names ('self_attention', 'dense') in the `build_model_architecture` function.")
+    st.error("This may be due to an architecture mismatch. Please check the layer names ('self_attention', 'dense') and the base model in the `build_model_architecture` function.")
     st.stop()
 
 # === Class names ===
 class_names = ['Cataract', 'Glaucoma', 'Normal', 'Diabetic Retinopathy']
 
 # === UI Header ===
+# ... (rest of the UI code is unchanged) ...
 st.markdown("""
     <h2 style='text-align: center; color: #4B8BBE;'>👁️ Eye Disease Detector</h2>
     <p style='text-align: center;'>Upload an eye image to detect common eye diseases using a deep learning model.</p>
