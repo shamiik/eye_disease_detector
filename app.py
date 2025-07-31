@@ -1,9 +1,11 @@
+# app.py
+
 import os
 import gdown
 import streamlit as st
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
-from tensorflow.keras.layers import SelfAttention
+from tensorflow.keras.layers import SelfAttention  # Correct import from Keras
 import numpy as np
 from PIL import Image
 
@@ -11,7 +13,6 @@ from PIL import Image
 st.set_page_config(page_title="Eye Disease Detector", page_icon="👁️", layout="centered")
 
 # === Model download ===
-# It's good practice to place large files that don't change often in a separate directory
 model_dir = "models"
 model_path = os.path.join(model_dir, "ensemble.h5")
 google_drive_file_id = "1nMMuGAK1HSnSuBe8P1st_tq3ltsK_738"
@@ -28,7 +29,11 @@ def load_eye_model():
     # Load the model with the custom object pointing to the Keras implementation
     return load_model(model_path, custom_objects={"SelfAttention": SelfAttention})
 
-model = load_eye_model()
+try:
+    model = load_eye_model()
+except Exception as e:
+    st.error(f"Error loading the model: {e}", icon="🚨")
+    st.stop()
 
 
 # === Class names ===
@@ -52,7 +57,7 @@ if uploaded_file is not None:
         st.image(img, caption="🖼️ Uploaded Image", use_column_width=True)
 
         with st.spinner("🔎 Analyzing the image..."):
-            # Preprocess image
+            # Preprocess image for the model
             img_resized = img.resize((224, 224))
             img_array = image.img_to_array(img_resized)
             img_array = img_array / 255.0
@@ -74,8 +79,8 @@ if uploaded_file is not None:
         """, unsafe_allow_html=True)
 
     except Exception as e:
-        st.error(f"An error occurred: {e}")
-        st.error("Please try uploading a different image file.")
+        st.error(f"An error occurred during image processing: {e}")
+        st.error("Please try uploading a valid image file.")
 
 else:
     st.info("👈 Please upload an eye image using the sidebar to begin.")
