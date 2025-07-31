@@ -90,7 +90,6 @@
 
 
 
-
 # app.py
 
 import os
@@ -105,36 +104,39 @@ from PIL import Image
 
 # =============================================================================
 #
-#  FINAL SOLUTION: Custom SelfAttention Layer Definition
+#  FINAL SOLUTION v2: Robust Custom SelfAttention Layer
 #
-#  By defining this class directly in our app, we remove the need for the
-#  unreliable `tensorflow-addons` library. When we load the model, Keras
-#  will use this local class instead of searching for an external one.
+#  This version correctly handles the initialization and configuration of the
+#  layer, resolving the 'batch_shape' keyword argument error. It explicitly
+#  defines its parameters and passes all other arguments to the parent class.
 #
 # =============================================================================
 class SelfAttention(Layer):
-    def __init__(self, **kwargs):
+    # We add num_heads and key_dim to the constructor
+    def __init__(self, num_heads=8, key_dim=256, **kwargs):
+        # Crucially, we pass the **kwargs up to the parent Layer's constructor
         super(SelfAttention, self).__init__(**kwargs)
-        # These are the core components of a self-attention mechanism
-        # The parameters (num_heads, key_dim) should ideally match what was used during model training.
-        # These are common default values that are likely to work.
-        self.mha = MultiHeadAttention(num_heads=8, key_dim=256)
+        self.num_heads = num_heads
+        self.key_dim = key_dim
+        self.mha = MultiHeadAttention(num_heads=self.num_heads, key_dim=self.key_dim)
         self.layernorm = LayerNormalization()
         self.add = tf.keras.layers.Add()
 
     def call(self, x):
-        # Self-attention means the query, key, and value are all the same tensor 'x'
         attn_output = self.mha(query=x, value=x, key=x)
-        # A residual connection is a standard part of attention blocks
         x = self.add([x, attn_output])
-        # Normalization stabilizes the network
         x = self.layernorm(x)
         return x
 
+    # The get_config method is updated to save our custom parameters
     def get_config(self):
-        # This method is crucial for allowing the model to be saved and loaded
         config = super().get_config()
+        config.update({
+            'num_heads': self.num_heads,
+            'key_dim': self.key_dim,
+        })
         return config
+
 
 # === Streamlit Page Config ===
 st.set_page_config(page_title="Eye Disease Detector", page_icon="👁️", layout="centered")
@@ -153,7 +155,7 @@ if not os.path.exists(model_path):
 # === Load model with our custom SelfAttention layer ===
 @st.cache_resource
 def load_eye_model():
-    # We tell Keras: "When you see 'SelfAttention' in the model file, use our class defined above."
+    # The custom_objects dictionary points to our robust SelfAttention class
     return load_model(
         model_path,
         custom_objects={"SelfAttention": SelfAttention}
