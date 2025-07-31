@@ -1,11 +1,14 @@
-# app.py
-
 import os
 import gdown
 import streamlit as st
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
-from tensorflow.keras.layers import SelfAttention
+#
+# --- IMPORTANT CHANGE HERE ---
+# Import MultiHeadAttention, which is the modern equivalent and what your
+# model will be mapped to.
+from tensorflow.keras.layers import MultiHeadAttention
+#
 import numpy as np
 from PIL import Image
 
@@ -26,13 +29,21 @@ if not os.path.exists(model_path):
 # === Load model with SelfAttention ===
 @st.cache_resource
 def load_eye_model():
-    return load_model(model_path, custom_objects={"SelfAttention": SelfAttention})
+    # --- IMPORTANT CHANGE HERE ---
+    # When loading, we tell Keras that any layer named "SelfAttention" in the
+    # saved model file should be treated as a MultiHeadAttention layer.
+    return load_model(
+        model_path,
+        custom_objects={"SelfAttention": MultiHeadAttention}
+    )
 
 try:
     model = load_eye_model()
 except Exception as e:
     st.error(f"Error loading the model: {e}", icon="🚨")
+    st.info("The model may have been saved with an older version of TensorFlow. The app attempted to load it with a modern equivalent layer, but failed. Please check model compatibility.")
     st.stop()
+
 
 # === Class names ===
 class_names = ['Cataract', 'Glaucoma', 'Normal', 'Diabetic Retinopathy']
