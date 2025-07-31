@@ -62,7 +62,7 @@ class SelfAttention(Layer):
         return config
 
 def build_ensemble_model(img_size=(224, 224), num_classes=5):
-    """Creates a clean Keras model with the exact ensemble architecture."""
+    """ Creates a clean Keras model with the exact ensemble architecture."""
     inputs = Input(shape=(*img_size, 3), name="input_1")
 
     # VGG19 Branch
@@ -142,12 +142,13 @@ with st.spinner("Initializing application..."):
         st.stop()
 
 # --- Image Upload Sidebar ---
-st.sidebar.header("📤 Upload Retinal Image")
-uploaded_file = st.sidebar.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
+# st.sidebar.header("📤 Upload Retinal Image")
+st.markdown("---") 
+uploaded_file = st.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
 
 # --- Main Panel ---
 if uploaded_file is None:
-    st.info("👈 Please upload an eye image using the sidebar to begin analysis.")
+    st.info(" Please upload an eye image using the sidebar to begin analysis.")
 
 else:
     # --- Image Processing and Prediction ---
