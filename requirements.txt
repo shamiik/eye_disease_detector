@@ -1,8 +1,8 @@
 
 
-streamlit
 tf-nightly
-tensorflow-addons
+streamlit
+(anything else you need)
 numpy
 Pillow
 gdown
