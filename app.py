@@ -93,50 +93,67 @@ import os
 import gdown
 import streamlit as st
 import tensorflow as tf
-from tensorflow.keras.models import load_model
-from tensorflow.keras.layers import Layer, MultiHeadAttention
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Input, Layer, MultiHeadAttention
 from tensorflow.keras.preprocessing import image
 import numpy as np
 from PIL import Image
 
 # =============================================================================
 #
-#  FINAL SOLUTION: Using the Standard Keras `build` Method
+#  FINAL SOLUTION: Manual Architecture and Weight Loading
 #
-#  The previous approaches failed because of an error during layer initialization.
-#  This version uses the correct, standard Keras pattern by separating the
-#  initial configuration (`__init__`) from the layer's creation (`build`).
+#  The `load_model` function is failing to properly deserialize the custom
+#  layer. This final solution bypasses that problem entirely.
 #
-#  The `build` method is only called by Keras once the input shape is known,
-#  which is a more robust way to construct the layer and avoids the previous
-#  errors during model loading.
+#  1. We define the *exact* model architecture in Keras, including our
+#     own robust `SelfAttention` layer.
+#  2. We create an instance of this correct model.
+#  3. We then use `load_weights()` to load ONLY the trained weights from the
+#     .h5 file onto our new, correctly-built model.
+#
+#  This avoids the `Unrecognized keyword arguments` error because we are no
+#  longer asking Keras to reconstruct the layer from a broken configuration.
 #
 # =============================================================================
+
+# Define the robust custom layer one last time.
 class SelfAttention(Layer):
     def __init__(self, num_heads=8, key_dim=256, **kwargs):
         super(SelfAttention, self).__init__(**kwargs)
         self.num_heads = num_heads
         self.key_dim = key_dim
-        # Note: The MultiHeadAttention sub-layer is NOT created here.
-
+    
     def build(self, input_shape):
-        # The sub-layer is created here, inside the `build` method.
         self.mha = MultiHeadAttention(num_heads=self.num_heads, key_dim=self.key_dim)
-        super(SelfAttention, self).build(input_shape) # Finalize the build step
+        super(SelfAttention, self).build(input_shape)
 
     def call(self, x):
-        # Now we can safely use the sub-layer created in `build`.
         return self.mha(query=x, value=x, key=x)
 
     def get_config(self):
-        # Save the configuration that was passed to __init__.
         config = super().get_config()
-        config.update({
-            'num_heads': self.num_heads,
-            'key_dim': self.key_dim,
-        })
+        config.update({'num_heads': self.num_heads, 'key_dim': self.key_dim})
         return config
 
+# This function builds a new model with the same architecture as your trained one.
+# NOTE: This assumes a standard transfer learning architecture. This may need
+#       to be adjusted if your model is very different.
+def build_model_architecture():
+    # Base model (EfficientNetB0 is a common choice, this might be a point of failure if it's different)
+    base_model = tf.keras.applications.EfficientNetB0(include_top=False, input_shape=(224, 224, 3), pooling='avg')
+    base_model.trainable = True # Or False, depending on how it was trained
+
+    # Recreate the top layers
+    inputs = Input(shape=(224, 224, 3))
+    x = base_model(inputs, training=False)
+    # The Attention layer - the name 'self_attention' must match the name in the original model
+    x = SelfAttention(name='self_attention')(x)
+    # The final prediction layer - the name 'dense' must match the original
+    outputs = tf.keras.layers.Dense(4, activation='softmax', name='dense')(x)
+
+    model = Model(inputs, outputs)
+    return model
 
 # === Streamlit Page Config ===
 st.set_page_config(page_title="Eye Disease Detector", page_icon="👁️", layout="centered")
@@ -152,18 +169,20 @@ if not os.path.exists(model_path):
         gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
     st.success("✅ Model downloaded successfully!")
 
-# === Load model with our robust custom SelfAttention layer ===
+# === Load model using the new manual method ===
 @st.cache_resource
-def load_eye_model():
-    return load_model(
-        model_path,
-        custom_objects={"SelfAttention": SelfAttention}
-    )
+def load_eye_model_manually():
+    # 1. Build our clean architecture
+    fresh_model = build_model_architecture()
+    # 2. Load the weights from the file onto our clean model
+    fresh_model.load_weights(model_path)
+    return fresh_model
 
 try:
-    model = load_eye_model()
+    model = load_eye_model_manually()
 except Exception as e:
-    st.error(f"Error loading the model: {e}", icon="🚨")
+    st.error(f"A critical error occurred while building the model or loading weights: {e}", icon="🚨")
+    st.error("This may be due to an architecture mismatch. Please check the layer names ('self_attention', 'dense') in the `build_model_architecture` function.")
     st.stop()
 
 # === Class names ===
