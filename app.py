@@ -109,8 +109,9 @@ from PIL import Image
 
 # --- IMPORTANT: Revert to the original tensorflow_addons import ---
 import tensorflow_addons as tfa
-# === FIX: Add the specific import for SelfAttention ===
-from tensorflow_addons.layers import SelfAttention
+# === FIX: This is the correct import path for SelfAttention ===
+from tensorflow_addons.layers.attention import SelfAttention
+
 
 # === Streamlit Page Config ===
 st.set_page_config(page_title="Eye Disease Detector", page_icon="👁️", layout="centered")
@@ -129,7 +130,7 @@ if not os.path.exists(model_path):
 # === Load model with the original SelfAttention layer ===
 @st.cache_resource
 def load_eye_model():
-    # === FIX: Use the directly imported SelfAttention class ===
+    # Now, we load the model by telling it exactly where to find the SelfAttention layer
     return load_model(
         model_path,
         custom_objects={"SelfAttention": SelfAttention}
