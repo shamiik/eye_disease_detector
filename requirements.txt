@@ -1,9 +1,6 @@
-
-
-tf-nightly
+tensorflow==2.15.0
+keras==2.15.0
 streamlit
-(anything else you need)
 numpy
 Pillow
 gdown
-
