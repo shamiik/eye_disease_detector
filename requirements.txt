@@ -1,7 +1,9 @@
 # requirements.txt
 
 streamlit
-tensorflow==2.16.1
-numpy
+tensorflow==2.11.0
+keras==2.11.0
+tensorflow-addons==0.21.0
+numpy==1.23.5
 Pillow
 gdown
