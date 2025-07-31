@@ -87,6 +87,7 @@
 
 
 # app.py
+# app.py
 
 import os
 import gdown
@@ -100,16 +101,16 @@ from PIL import Image
 
 # =============================================================================
 #
-#  FINAL SOLUTION v5: A Minimal and Faithful Custom Layer
+#  FINAL SOLUTION: Using the Standard Keras `build` Method
 #
-#  The previous errors indicate a fundamental mismatch between our custom layer
-#  and the model's saved architecture. The original `tensorflow-addons` layer
-#  was likely a simple wrapper around MultiHeadAttention.
+#  The previous approaches failed because of an error during layer initialization.
+#  This version uses the correct, standard Keras pattern by separating the
+#  initial configuration (`__init__`) from the layer's creation (`build`).
 #
-#  This new class is a true 1-to-1 replacement. It ONLY performs attention.
-#  The other steps (like Add and LayerNormalization) are expected to be
-#  separate layers already present in the saved model file. This should
-#  resolve the architectural conflict and the loading error.
+#  The `build` method is only called by Keras once the input shape is known,
+#  which is a more robust way to construct the layer and avoids the previous
+ax
+#  errors during model loading.
 #
 # =============================================================================
 class SelfAttention(Layer):
@@ -117,14 +118,19 @@ class SelfAttention(Layer):
         super(SelfAttention, self).__init__(**kwargs)
         self.num_heads = num_heads
         self.key_dim = key_dim
+        # Note: The MultiHeadAttention sub-layer is NOT created here.
+
+    def build(self, input_shape):
+        # The sub-layer is created here, inside the `build` method.
         self.mha = MultiHeadAttention(num_heads=self.num_heads, key_dim=self.key_dim)
+        super(SelfAttention, self).build(input_shape) # Finalize the build step
 
     def call(self, x):
-        # This is now a simple, direct call to the attention layer,
-        # matching what the original TFA layer did.
+        # Now we can safely use the sub-layer created in `build`.
         return self.mha(query=x, value=x, key=x)
 
     def get_config(self):
+        # Save the configuration that was passed to __init__.
         config = super().get_config()
         config.update({
             'num_heads': self.num_heads,
@@ -147,7 +153,7 @@ if not os.path.exists(model_path):
         gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
     st.success("✅ Model downloaded successfully!")
 
-# === Load model with our corrected custom SelfAttention layer ===
+# === Load model with our robust custom SelfAttention layer ===
 @st.cache_resource
 def load_eye_model():
     return load_model(
