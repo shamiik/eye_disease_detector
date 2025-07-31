@@ -5,3 +5,4 @@ keras==2.11.0
 numpy==1.23.5
 Pillow
 gdown
+h5py
