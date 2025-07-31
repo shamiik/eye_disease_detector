@@ -152,7 +152,7 @@ else:
     st.subheader("Uploaded Image")
     col1, col2, col3 = st.columns([1, 6, 1]) 
     with col2:
-        st.image(uploaded_image, width=350, caption="Your Uploaded Retinal Image")
+        st.image(uploaded_image, width=350, caption="Your Uploaded Image")
         
     st.markdown("---")
 
