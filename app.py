@@ -86,10 +86,6 @@
 #     st.info("👈 Please upload an eye image using the sidebar to begin.")
 
 
-
-
-
-
 # app.py
 
 import os
@@ -104,17 +100,18 @@ from PIL import Image
 
 # =============================================================================
 #
-#  FINAL SOLUTION v2: Robust Custom SelfAttention Layer
+#  FINAL SOLUTION v4: Explicitly Accepting the Problematic Argument
 #
-#  This version correctly handles the initialization and configuration of the
-#  layer, resolving the 'batch_shape' keyword argument error. It explicitly
-#  defines its parameters and passes all other arguments to the parent class.
+#  The error 'Unrecognized keyword arguments: ['batch_shape']' persists.
+#  This final version directly addresses the error by adding 'batch_shape=None'
+#  to the constructor's signature. This forces the layer to formally
+#  accept the argument during model loading, even though we will not use it,
+#  resolving the conflict with the Keras `load_model` function.
 #
 # =============================================================================
 class SelfAttention(Layer):
-    # We add num_heads and key_dim to the constructor
-    def __init__(self, num_heads=8, key_dim=256, **kwargs):
-        # Crucially, we pass the **kwargs up to the parent Layer's constructor
+    # The key fix: We explicitly add batch_shape to the signature.
+    def __init__(self, num_heads=8, key_dim=256, batch_shape=None, **kwargs):
         super(SelfAttention, self).__init__(**kwargs)
         self.num_heads = num_heads
         self.key_dim = key_dim
@@ -128,7 +125,6 @@ class SelfAttention(Layer):
         x = self.layernorm(x)
         return x
 
-    # The get_config method is updated to save our custom parameters
     def get_config(self):
         config = super().get_config()
         config.update({
@@ -155,7 +151,6 @@ if not os.path.exists(model_path):
 # === Load model with our custom SelfAttention layer ===
 @st.cache_resource
 def load_eye_model():
-    # The custom_objects dictionary points to our robust SelfAttention class
     return load_model(
         model_path,
         custom_objects={"SelfAttention": SelfAttention}
