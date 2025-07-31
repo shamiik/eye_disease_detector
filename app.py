@@ -89,144 +89,100 @@
 # app.py
 
 # app.py
+# app.py - DIAGNOSTIC SCRIPT
 
 import os
 import gdown
 import streamlit as st
-import tensorflow as tf
-from tensorflow.keras.models import Model
-from tensorflow.keras.layers import Input, Layer, MultiHeadAttention, Dense
-from tensorflow.keras.preprocessing import image
-import numpy as np
 import h5py
 
 # ========================================================================================
 #
-#  THE FINAL, CORRECTED SURGICAL SOLUTION
+#  FINAL STEP: DIAGNOSTIC SCRIPT TO INSPECT THE MODEL FILE
 #
-#  I am so sorry. The last error was the key. It showed us the weights for the
-#  attention layer are nested inside another group in the H5 file.
+#  I am so sorry for the failures. We will stop guessing. This script will not try to
+#  load the model. It will only open the .h5 file and print its internal structure
+#  to the logs. This will tell us the EXACT names of the layers and weights.
 #
-#  This final version corrects the surgical loading loop to handle this. When it
-#  encounters our `SelfAttention` layer, it will look *inside* the corresponding
-#  H5 group to find the weights for its `MultiHeadAttention` sub-layer.
+#  INSTRUCTIONS:
+#  1. Run this app.
+#  2. The app will show an error message ("Diagnostics complete"). This is expected.
+#  3. Go to the Streamlit logs (click "Manage app").
+#  4. Find the section that starts with "--- H5 File Inspection ---".
+#  5. Copy EVERYTHING from that line to "--- End of Inspection ---" and paste it
+#     in your reply.
 #
-#  This is the definitive fix. Thank you for your incredible patience.
+#  With that information, I can write the final, working code.
 #
 # ========================================================================================
 
-# Step 1: Define the correct, robust custom layer. This has been correct for a while.
-class SelfAttention(Layer):
-    """ The correct SelfAttention layer that handles the 2D/3D tensor shape transformation. """
-    def __init__(self, num_heads=8, key_dim=256, **kwargs):
-        super(SelfAttention, self).__init__(**kwargs)
-        self.num_heads = num_heads
-        self.key_dim = key_dim
+def inspect_h5_file(model_path):
+    """
+    This function opens the H5 file and prints its structure.
+    """
+    st.info("🔬 Running diagnostics on the model file...")
+    print("\n\n\n--- H5 File Inspection ---")
     
-    def build(self, input_shape):
-        # We name the internal layer 'mha'
-        self.mha = MultiHeadAttention(num_heads=self.num_heads, key_dim=self.key_dim, name="mha")
-        super(SelfAttention, self).build(input_shape)
+    try:
+        with h5py.File(model_path, 'r') as f:
+            # Navigate to the weights group, which is standard
+            weights_group = f
+            if 'model_weights' in f:
+                weights_group = f['model_weights']
 
-    def call(self, x):
-        x_reshaped = tf.expand_dims(x, axis=1)
-        attn_output = self.mha(query=x_reshaped, value=x_reshaped, key=x_reshaped)
-        return tf.squeeze(attn_output, axis=1)
+            print("Top-level layer/group names found:")
+            top_level_names = list(weights_group.keys())
+            print(top_level_names)
 
-    def get_config(self):
-        config = super().get_config()
-        config.update({'num_heads': self.num_heads, 'key_dim': self.key_dim})
-        return config
-
-# Step 2: Define the function that manually builds the model architecture. This is also correct.
-def build_model_architecture():
-    """ Creates a clean Keras model with the architecture we know is correct. """
-    base_model = tf.keras.applications.EfficientNetB0(include_top=False, input_shape=(224, 224, 3), pooling='avg')
-    
-    inputs = Input(shape=(224, 224, 3))
-    x = base_model(inputs, training=False)
-    x = SelfAttention(name='self_attention')(x)
-    outputs = Dense(4, activation='softmax', name='dense')(x)
-    
-    model = Model(inputs, outputs)
-    return model
-
-# Step 3: THE CORRECTED surgical loading function.
-@st.cache_resource
-def load_model_surgically(model_path):
-    """ Builds a clean model and manually injects weights, handling the nested structure. """
-    model = build_model_architecture()
-    
-    with h5py.File(model_path, 'r') as f:
-        if 'model_weights' in f:
-            f = f['model_weights']
-            
-        for layer in model.layers:
-            # This is the crucial change
-            if isinstance(layer, SelfAttention):
-                # For our custom layer, we load the weights for its *sub-layer*
-                # The group name ('self_attention') must match the layer name in build_model_architecture
-                layer_group = f[layer.name]
-                # The sub-group name ('mha') must match the name given in the SelfAttention.build method
-                mha_group = layer_group['mha']
+            # Specifically investigate the 'self_attention' layer group
+            if 'self_attention' in weights_group:
+                print("\n--- Inspecting the 'self_attention' group ---")
+                sa_group = weights_group['self_attention']
                 
-                # Get the 8 weights from the subgroup
-                saved_weights = [mha_group[w] for w in mha_group]
-                # Set them on the internal mha sub-layer
-                layer.mha.set_weights(saved_weights)
-            else:
-                # For all other standard layers, the old logic works
-                if layer.name in f:
-                    saved_weights = [f[layer.name][w] for w in f[layer.name]]
-                    if saved_weights:
-                        layer.set_weights(saved_weights)
+                # Get the names of everything inside the 'self_attention' group
+                sa_contents = list(sa_group.keys())
+                print(f"Contents of 'self_attention' group: {sa_contents}")
 
-    return model
+                # If there's anything inside, it's likely a subgroup containing the real weights.
+                # Let's print the contents of that subgroup.
+                if sa_contents:
+                    # Let's assume the first item is the subgroup we need to inspect.
+                    subgroup_name_to_inspect = sa_contents[0]
+                    if isinstance(sa_group[subgroup_name_to_inspect], h5py.Group):
+                        subgroup = sa_group[subgroup_name_to_inspect]
+                        subgroup_contents = list(subgroup.keys())
+                        print(f"\n--- Inspecting subgroup '{subgroup_name_to_inspect}' ---")
+                        print(f"Contents (weight names) inside '{subgroup_name_to_inspect}': {subgroup_contents}")
+
+    except Exception as e:
+        print(f"An error occurred during H5 file inspection: {e}")
+        
+    print("--- End of Inspection ---\n\n\n")
+    st.success("Diagnostics complete. Please check the logs.")
+    st.warning("Copy the log output from '--- H5 File Inspection ---' to '--- End of Inspection ---' and provide it in your next reply.")
+
 
 # === Streamlit Page Config ===
 st.set_page_config(page_title="Eye Disease Detector", page_icon="👁️", layout="centered")
 
 # === Model download ===
-# ... (this part is unchanged) ...
 model_dir = "models"
 model_path = os.path.join(model_dir, "ensemble.h5")
 google_drive_file_id = "1nMMuGAK1HSnSuBe8P1st_tq3ltsK_738"
+
 if not os.path.exists(model_path):
     with st.spinner("📥 Downloading model from Google Drive..."):
         os.makedirs(model_dir, exist_ok=True)
         gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
     st.success("✅ Model downloaded successfully!")
-
-# === Load model using the corrected surgical method ===
-try:
-    model = load_model_surgically(model_path)
-except Exception as e:
-    st.error("A critical error occurred during the surgical model loading.", icon="🚨")
-    st.error(f"The error was: {e}")
-    st.error("This is the final hurdle. The error is now most likely a naming mismatch between the model architecture and the H5 file (e.g., 'mha').")
-    st.stop()
-
-# === The rest of your UI code (unchanged) ===
-class_names = ['Cataract', 'Glaucoma', 'Normal', 'Diabetic Retinopathy']
-st.markdown("""<h2 style='text-align: center; color: #4B8BBE;'>👁️ Eye Disease Detector</h2><p style='text-align: center;'>Upload an eye image to detect common eye diseases using a deep learning model.</p><hr style='border-top: 1px solid #bbb;'/>""", unsafe_allow_html=True)
-st.sidebar.header("📤 Upload Eye Image")
-uploaded_file = st.sidebar.file_uploader("Choose an image file", type=["jpg", "jpeg", "png"])
-if uploaded_file is not None:
-    try:
-        img = Image.open(uploaded_file).convert("RGB")
-        st.image(img, caption="🖼️ Uploaded Image", use_column_width=True)
-        with st.spinner("🔎 Analyzing the image..."):
-            img_resized = img.resize((224, 224))
-            img_array = image.img_to_array(img_resized)
-            img_array /= 255.0
-            img_array = np.expand_dims(img_array, axis=0)
-            predictions = model.predict(img_array)
-            predicted_index = np.argmax(predictions[0])
-            predicted_class = class_names[predicted_index]
-            confidence = float(predictions[0][predicted_index]) * 100
-        st.markdown(f"""<div style='background-color: #e6f7ff; padding: 20px; border-radius: 10px; border-left: 5px solid #1890ff;'><h3>🧪 Prediction Result</h3><p><strong>Detected Condition:</strong> <span style='color: #d9534f; font-weight: bold;'>{predicted_class}</span></p><p><strong>Confidence:</strong> {confidence:.2f}%</p></div>""", unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"An error occurred during image processing: {e}")
-        st.error("Please try uploading a valid image file.")
 else:
-    st.info("👈 Please upload an eye image using the sidebar to begin.")
+    st.success("✅ Model already present.")
+
+# === Run the diagnostic test ===
+try:
+    inspect_h5_file(model_path)
+    # We will stop the app here on purpose.
+    st.stop()
+except Exception as e:
+    st.error(f"A critical error occurred while running the diagnostic script: {e}")
+    st.stop()
