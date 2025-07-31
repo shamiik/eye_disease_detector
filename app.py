@@ -21,13 +21,19 @@ MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
 IMG_SIZE = (224, 224)
 
 CLASS_NAMES = [
+    'Cataract ', 
+    'Conjunctivitis', 
     'Eyelid', 
     'Normal', 
-    'Cataract', 
-    'Uveitis', 
-    'Conjunctivitis' 
+    'Uveitis'
 ]
 # {'Eyelid': 0, 'Normal': 1, 'Cataract': 2, 'Uveitis': 3, 'Conjunctivitis': 4}
+
+# Cataract     0.9877    0.9796    0.9836       245
+# Conjunctivitis     0.9573    0.9752    0.9662       161
+#         Eyelid     0.9791    0.9873    0.9832       237
+#         Normal     0.9898    0.9966    0.9932       293
+#        Uveitis 
 
 # -------------------- DEEP LEARNING MODEL DEFINITION --------------------
 
