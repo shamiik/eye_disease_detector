@@ -109,7 +109,6 @@ from PIL import Image
 #
 #  The `build` method is only called by Keras once the input shape is known,
 #  which is a more robust way to construct the layer and avoids the previous
-ax
 #  errors during model loading.
 #
 # =============================================================================
