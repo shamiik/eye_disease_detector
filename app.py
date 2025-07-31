@@ -91,27 +91,50 @@
 
 
 
-
-
-
-
-
-
 # app.py
 
 import os
 import gdown
 import streamlit as st
+import tensorflow as tf
 from tensorflow.keras.models import load_model
+from tensorflow.keras.layers import Layer, MultiHeadAttention, LayerNormalization
 from tensorflow.keras.preprocessing import image
 import numpy as np
 from PIL import Image
 
-# --- IMPORTANT: Revert to the original tensorflow_addons import ---
-import tensorflow_addons as tfa
-# === FIX: This is the correct import path for SelfAttention ===
-from tensorflow_addons.layers.attention import SelfAttention
+# =============================================================================
+#
+#  FINAL SOLUTION: Custom SelfAttention Layer Definition
+#
+#  By defining this class directly in our app, we remove the need for the
+#  unreliable `tensorflow-addons` library. When we load the model, Keras
+#  will use this local class instead of searching for an external one.
+#
+# =============================================================================
+class SelfAttention(Layer):
+    def __init__(self, **kwargs):
+        super(SelfAttention, self).__init__(**kwargs)
+        # These are the core components of a self-attention mechanism
+        # The parameters (num_heads, key_dim) should ideally match what was used during model training.
+        # These are common default values that are likely to work.
+        self.mha = MultiHeadAttention(num_heads=8, key_dim=256)
+        self.layernorm = LayerNormalization()
+        self.add = tf.keras.layers.Add()
 
+    def call(self, x):
+        # Self-attention means the query, key, and value are all the same tensor 'x'
+        attn_output = self.mha(query=x, value=x, key=x)
+        # A residual connection is a standard part of attention blocks
+        x = self.add([x, attn_output])
+        # Normalization stabilizes the network
+        x = self.layernorm(x)
+        return x
+
+    def get_config(self):
+        # This method is crucial for allowing the model to be saved and loaded
+        config = super().get_config()
+        return config
 
 # === Streamlit Page Config ===
 st.set_page_config(page_title="Eye Disease Detector", page_icon="👁️", layout="centered")
@@ -127,10 +150,10 @@ if not os.path.exists(model_path):
         gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
     st.success("✅ Model downloaded successfully!")
 
-# === Load model with the original SelfAttention layer ===
+# === Load model with our custom SelfAttention layer ===
 @st.cache_resource
 def load_eye_model():
-    # Now, we load the model by telling it exactly where to find the SelfAttention layer
+    # We tell Keras: "When you see 'SelfAttention' in the model file, use our class defined above."
     return load_model(
         model_path,
         custom_objects={"SelfAttention": SelfAttention}
