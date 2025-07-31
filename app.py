@@ -1,5 +1,3 @@
-# app.py - Polished and Final Version (Compatible with Streamlit v1.22.0)
-
 import os
 import gdown
 import streamlit as st
@@ -16,14 +14,12 @@ from PIL import Image
 
 # -------------------- CONSTANTS --------------------
 
-
 GOOGLE_DRIVE_FILE_ID = "1nMMuGAK1HSnSuBe8P1st_tq3ltsK_738"
 MODEL_DIR = "models"
 MODEL_FILENAME = "ensemble.h5"
 MODEL_PATH = os.path.join(MODEL_DIR, MODEL_FILENAME)
 IMG_SIZE = (224, 224)
 
-# IMPORTANT: These class names must be in the exact same order as the training data folders.
 CLASS_NAMES = [
     'Eyelid', 
     'Normal', 
@@ -34,7 +30,6 @@ CLASS_NAMES = [
 # {'Eyelid': 0, 'Normal': 1, 'Cataract': 2, 'Uveitis': 3, 'Conjunctivitis': 4}
 
 # -------------------- DEEP LEARNING MODEL DEFINITION --------------------
-# This is the "ground truth" model architecture from your training script.
 
 class SelfAttention(Layer):
     """A faithful re-implementation of the SelfAttention layer from the training script."""
@@ -153,17 +148,17 @@ else:
     with st.spinner("🔬 Analyzing the image..."):
         uploaded_image, predicted_class, confidence = process_and_predict(uploaded_file, model)
     
-    # --- Display Uploaded Image (Resized) ---
-    st.subheader("🖼️ Uploaded Image")
-    # UI FIX: Displaying the image with a fixed width for a cleaner look.
-    st.image(uploaded_image, width=350, caption="Your Uploaded Retinal Image")
+    # --- Display Uploaded Image ---
+    st.subheader("Uploaded Image")
+    col1, col2, col3 = st.columns([1, 6, 1]) 
+    with col2:
+        st.image(uploaded_image, width=350, caption="Your Uploaded Retinal Image")
+        
     st.markdown("---")
 
     # --- Display Prediction Result (High-Contrast Box) ---
     st.subheader("🧪 Prediction Result")
     
-    # UI FIX: Using st.success and st.warning, which are compatible with older
-    # Streamlit versions and provide excellent contrast.
     if predicted_class == "Normal":
         st.success(f"**Detected Condition: {predicted_class}**")
         st.markdown(f"The model is **{confidence:.2f}%** confident that the eye appears to be normal.")
