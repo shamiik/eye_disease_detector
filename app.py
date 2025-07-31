@@ -93,37 +93,36 @@ import gdown
 import streamlit as st
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-from tensorflow.keras.layers import Layer, MultiHeadAttention, LayerNormalization
+from tensorflow.keras.layers import Layer, MultiHeadAttention
 from tensorflow.keras.preprocessing import image
 import numpy as np
 from PIL import Image
 
 # =============================================================================
 #
-#  FINAL SOLUTION v4: Explicitly Accepting the Problematic Argument
+#  FINAL SOLUTION v5: A Minimal and Faithful Custom Layer
 #
-#  The error 'Unrecognized keyword arguments: ['batch_shape']' persists.
-#  This final version directly addresses the error by adding 'batch_shape=None'
-#  to the constructor's signature. This forces the layer to formally
-#  accept the argument during model loading, even though we will not use it,
-#  resolving the conflict with the Keras `load_model` function.
+#  The previous errors indicate a fundamental mismatch between our custom layer
+#  and the model's saved architecture. The original `tensorflow-addons` layer
+#  was likely a simple wrapper around MultiHeadAttention.
+#
+#  This new class is a true 1-to-1 replacement. It ONLY performs attention.
+#  The other steps (like Add and LayerNormalization) are expected to be
+#  separate layers already present in the saved model file. This should
+#  resolve the architectural conflict and the loading error.
 #
 # =============================================================================
 class SelfAttention(Layer):
-    # The key fix: We explicitly add batch_shape to the signature.
-    def __init__(self, num_heads=8, key_dim=256, batch_shape=None, **kwargs):
+    def __init__(self, num_heads=8, key_dim=256, **kwargs):
         super(SelfAttention, self).__init__(**kwargs)
         self.num_heads = num_heads
         self.key_dim = key_dim
         self.mha = MultiHeadAttention(num_heads=self.num_heads, key_dim=self.key_dim)
-        self.layernorm = LayerNormalization()
-        self.add = tf.keras.layers.Add()
 
     def call(self, x):
-        attn_output = self.mha(query=x, value=x, key=x)
-        x = self.add([x, attn_output])
-        x = self.layernorm(x)
-        return x
+        # This is now a simple, direct call to the attention layer,
+        # matching what the original TFA layer did.
+        return self.mha(query=x, value=x, key=x)
 
     def get_config(self):
         config = super().get_config()
@@ -148,7 +147,7 @@ if not os.path.exists(model_path):
         gdown.download(f"https://drive.google.com/uc?id={google_drive_file_id}", model_path, quiet=False)
     st.success("✅ Model downloaded successfully!")
 
-# === Load model with our custom SelfAttention layer ===
+# === Load model with our corrected custom SelfAttention layer ===
 @st.cache_resource
 def load_eye_model():
     return load_model(
